@@ -38,7 +38,11 @@ int number_of_unique_flows = 0;
 void PrintFlows()
 {
     printf("Flow List:\n");
-    for (int i = 0; i < number_of_unique_flows; i++)
+    if (number_of_unique_flows == 0)
+    {
+        return;
+    }
+    for (int i = 0; i <= number_of_unique_flows; i++)
     {
         printf("%s:%d <-> %s:%d %d => %d\n", flows[i].source_ip_address, flows[i].source_port, flows[i].dest_ip_address, flows[i].dest_port, flows[i].ip_protocol, flows[i].packet_count);
     }
