@@ -34,6 +34,7 @@ struct Flow
 
 struct Flow flows[MAX_FLOWS];
 int number_of_unique_flows = 0;
+int terminate_program = 0;
 
 void PrintFlows()
 {
@@ -50,8 +51,15 @@ void PrintFlows()
 
 void SignalHandler(int signo)
 {
-    PrintFlows();
-    alarm(10);
+    if (signo == SIGALRM)
+    {
+        PrintFlows();
+        alarm(10);
+    }
+    else if (signo == SIGINT || signo == SIGTERM)
+    {
+        terminate_program = 1;
+    }
 }
 
 int CreateRawSocket()
@@ -220,9 +228,11 @@ int main(int argc, char **argv)
     }
 
     signal(SIGALRM, SignalHandler);
+    signal(SIGINT, SignalHandler); // Handle Ctrl+C (SIGINT)
+    signal(SIGTERM, SignalHandler);
     alarm(10);
 
-    while (1)
+    while (!terminate_program)
     {
         if ((packet_len = recvfrom(raw_socket, packet, MAX_PACKET_LEN, 0, (struct sockaddr *)&socket_address, &socket_address_size)) == -1)
         {
