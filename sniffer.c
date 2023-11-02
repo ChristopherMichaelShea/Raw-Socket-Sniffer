@@ -32,6 +32,7 @@ struct Flow
     int packet_count;
 };
 
+/* Global variables for use with signal*/
 struct Flow flows[MAX_FLOWS];
 int number_of_unique_flows = 0;
 int terminate_program = 0;
@@ -63,6 +64,7 @@ void SignalHandler(int signo)
         PrintFlows();
         alarm(10);
     }
+    /* Exits main while-loop on termination to allow for resource clean up (close socket)*/
     else if (signo == SIGINT || signo == SIGTERM)
     {
         terminate_program = 1;
@@ -72,6 +74,9 @@ void SignalHandler(int signo)
 int CreateRawSocket()
 {
     int rawsock;
+
+    /* PF_Packet to access OSI Layer 2*/
+    /* ETH_P_IP to allow only IPv4 packets*/
     if ((rawsock = socket(PF_PACKET, SOCK_RAW, htons(ETH_P_IP))) == -1)
     {
         perror("Error creating raw socket: ");
@@ -86,21 +91,14 @@ int BindRawSocketToInterface(char *interface, int rawsock, int protocol)
     struct sockaddr_ll sll;
     struct ifreq ifr;
 
+    /* Ensures that the structures are initially empty before populating*/
     bzero(&sll, sizeof(sll));
     bzero(&ifr, sizeof(ifr));
-
-    /* First Get the Interface Index */
-    if (strlen(interface) >= IFNAMSIZ)
-    {
-        fprintf(stderr, "Interface name is too long\n");
-        close(rawsock);
-        return -1;
-    }
 
     strncpy((char *)ifr.ifr_name, interface, IFNAMSIZ);
     if ((ioctl(rawsock, SIOCGIFINDEX, &ifr)) == -1)
     {
-        perror("Error getting Interface index");
+        perror("Error getting interface index");
         close(rawsock);
         return -1;
     }
@@ -222,6 +220,11 @@ int main(int argc, char **argv)
                argv[0]);
         return 1;
     }
+    else if (strlen(argv[1]) >= IFNAMSIZ)
+    {
+        fprintf(stderr, "Interface name is too long\n");
+        return -1;
+    }
 
     unsigned char packet[MAX_PACKET_LEN];
     int packet_len;
@@ -231,7 +234,7 @@ int main(int argc, char **argv)
     int raw_socket = CreateRawSocket();
     if (BindRawSocketToInterface(argv[1], raw_socket, ETH_P_IP) == -1)
     {
-        fprintf(stderr, "Error binding raw socket to interface. Exiting.\n");
+        fprintf(stderr, "Error binding raw socket to interface.\n");
         close(raw_socket);
         return 1;
     }
