@@ -42,7 +42,7 @@ void PrintFlows()
     {
         return;
     }
-    for (int i = 0; i <= number_of_unique_flows; i++)
+    for (int i = 0; i < number_of_unique_flows; i++)
     {
         printf("%s:%d <-> %s:%d %d => %d\n", flows[i].source_ip_address, flows[i].source_port, flows[i].dest_ip_address, flows[i].dest_port, flows[i].ip_protocol, flows[i].packet_count);
     }
@@ -77,6 +77,7 @@ int BindRawSocketToInterface(char *interface, int rawsock, int protocol)
     if (strlen(interface) >= IFNAMSIZ)
     {
         fprintf(stderr, "Interface name is too long\n");
+        close(rawsock);
         return -1;
     }
 
@@ -84,6 +85,7 @@ int BindRawSocketToInterface(char *interface, int rawsock, int protocol)
     if ((ioctl(rawsock, SIOCGIFINDEX, &ifr)) == -1)
     {
         perror("Error getting Interface index");
+        close(rawsock);
         return -1;
     }
     /* Bind our raw socket to this interface */
@@ -94,6 +96,7 @@ int BindRawSocketToInterface(char *interface, int rawsock, int protocol)
     if ((bind(rawsock, (struct sockaddr *)&sll, sizeof(sll))) == -1)
     {
         perror("Error binding raw socket to interface");
+        close(rawsock);
         return -1;
     }
     return 1;
@@ -231,5 +234,6 @@ int main(int argc, char **argv)
             ParsePacketHeader(packet, packet_len);
         }
     }
+    close(raw_socket);
     return 0;
 }
