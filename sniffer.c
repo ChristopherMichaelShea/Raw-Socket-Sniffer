@@ -45,7 +45,14 @@ void PrintFlows()
     }
     for (int i = 0; i < number_of_unique_flows; i++)
     {
-        printf("%s:%d <-> %s:%d %d => %d\n", flows[i].source_ip_address, flows[i].source_port, flows[i].dest_ip_address, flows[i].dest_port, flows[i].ip_protocol, flows[i].packet_count);
+        if (flows[i].ip_protocol == IPPROTO_UDP || flows[i].ip_protocol == IPPROTO_TCP)
+        {
+            printf("%s:%d <-> %s:%d %d => %d\n", flows[i].source_ip_address, flows[i].source_port, flows[i].dest_ip_address, flows[i].dest_port, flows[i].ip_protocol, flows[i].packet_count);
+        }
+        else
+        {
+            printf("%s <-> %s %d => %d\n", flows[i].source_ip_address, flows[i].dest_ip_address, flows[i].ip_protocol, flows[i].packet_count);
+        }
     }
 }
 
@@ -68,6 +75,7 @@ int CreateRawSocket()
     if ((rawsock = socket(PF_PACKET, SOCK_RAW, htons(ETH_P_IP))) == -1)
     {
         perror("Error creating raw socket: ");
+        close(rawsock);
         exit(-1);
     }
     return rawsock;
@@ -158,7 +166,7 @@ void ParsePacketHeader(unsigned char *packet, int packet_length)
 
     if (packet_length < (sizeof(struct ethhdr) + sizeof(struct iphdr) + sizeof(struct tcphdr)))
     {
-        fprintf(stderr, "TCP Header not present\n");
+        fprintf(stderr, "IP protocol header not present\n");
         return;
     }
 
@@ -198,7 +206,8 @@ void ParsePacketHeader(unsigned char *packet, int packet_length)
     }
     else
     {
-        fprintf(stderr, "Not a TCP or UDP packet\n");
+        current_flow.source_port = 0;
+        current_flow.dest_port = 0;
     }
 
     UpdateFlowList(current_flow);
