@@ -4,6 +4,7 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdbool.h>
 #include <string.h>
 #include <sys/socket.h>
 #include <linux/if_packet.h>
@@ -29,13 +30,13 @@ struct Flow
     uint16_t source_port;
     uint16_t dest_port;
     uint8_t ip_protocol;
-    int packet_count;
+    unsigned int packet_count;
 };
 
 /* Global variables for use with signal*/
 struct Flow flows[MAX_FLOWS];
-int number_of_unique_flows = 0;
-int terminate_program = 0;
+unsigned int number_of_unique_flows = 0;
+bool terminate_program = false;
 
 void PrintFlows()
 {
@@ -67,7 +68,7 @@ void SignalHandler(int signo)
     /* Exits main while-loop on termination to allow for resource clean up (close socket)*/
     else if (signo == SIGINT || signo == SIGTERM)
     {
-        terminate_program = 1;
+        terminate_program = true;
     }
 }
 
@@ -81,7 +82,7 @@ int CreateRawSocket()
     {
         perror("Error creating raw socket");
         close(raw_socket);
-        exit(-1);
+        return -1;
     }
     return raw_socket;
 }
@@ -115,7 +116,7 @@ int BindRawSocketToInterface(char *interface, int raw_socket, int protocol)
         close(raw_socket);
         return -1;
     }
-    return 1;
+    return 0;
 }
 
 void UpdateFlowList(struct Flow current_flow)
@@ -153,7 +154,7 @@ void UpdateFlowList(struct Flow current_flow)
         else
         {
             fprintf(stderr, "Max flow limit reached.\n");
-            terminate_program = 1;
+            terminate_program = true;
         }
     }
 }
@@ -224,7 +225,7 @@ int main(int argc, char **argv)
         printf("Invalid number of arguments\n"
                "Usage: %s <interface>\n",
                argv[0]);
-        return 1;
+        return -1;
     }
     else if (strlen(argv[1]) >= IFNAMSIZ)
     {
@@ -232,36 +233,38 @@ int main(int argc, char **argv)
         return -1;
     }
 
-    unsigned char packet[MAX_PACKET_LEN];
-    int packet_len;
-    struct sockaddr_ll socket_address;
-    int socket_address_size = sizeof(socket_address);
-
     int raw_socket = CreateRawSocket();
+
     if (BindRawSocketToInterface(argv[1], raw_socket, ETH_P_IP) == -1)
     {
         fprintf(stderr, "Error binding raw socket to interface.\n");
         close(raw_socket);
-        return 1;
+        return -1;
     }
 
+    unsigned char packet[MAX_PACKET_LEN];
+    int packet_length;
+    struct sockaddr_ll socket_address;
+    int socket_address_size = sizeof(socket_address);
+
     signal(SIGALRM, SignalHandler);
-    signal(SIGINT, SignalHandler); // Handle Ctrl+C (SIGINT)
+    signal(SIGINT, SignalHandler);
     signal(SIGTERM, SignalHandler);
     alarm(10);
 
     while (!terminate_program)
     {
-        if ((packet_len = recvfrom(raw_socket, packet, MAX_PACKET_LEN, 0, (struct sockaddr *)&socket_address, &socket_address_size)) == -1)
+        if ((packet_length = recvfrom(raw_socket, packet, MAX_PACKET_LEN, 0, (struct sockaddr *)&socket_address, &socket_address_size)) == -1)
         {
-            perror("Recv from returned -1: ");
-            exit(-1);
+            perror("Error receiving packet: ");
+            return -1;
         }
         else
         {
-            ParsePacketHeader(packet, packet_len);
+            ParsePacketHeader(packet, packet_length);
         }
     }
+
     close(raw_socket);
     return 0;
 }
