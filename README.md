@@ -2,7 +2,11 @@
 
 ## Description
 
-This program is a simple network packet sniffer. It records IP header information from packets on an open RAW socket using C/Linux on a specified network interface and displays information about them, including the source and destination IP addresses, the protocol, and the packet count.
+This program is a network packet sniffer implemented in C on a Linux operating system. It parses IP header information from incoming IPv4 packets on an open RAW socket using a specified network interface and displays information about them every 10 seconds. Parsed information includes the protocol, source and destination IP addresses, and ports.
+
+## Prerequisites
+1. A Linux operating system.
+2. A C compiler (e.g., GCC) to build the application.
 
 ## Installation
 
@@ -18,7 +22,7 @@ To use this program, run it as root and specify the network interface you want t
 
 `sudo ./sniffer eth0`
 
-The program will display information about each packet it captures.
+The program will display information about each packet it captures every 10 seconds.
 
 ## Code Details
 
