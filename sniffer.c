@@ -185,24 +185,25 @@ void ParsePacketHeader(unsigned char *packet, int packet_length)
 
     ip_header = (struct iphdr *)(packet + sizeof(struct ethhdr));
 
+    size_t ip_header_length_in_bytes = (ip_header->ihl) * 4;
+
     dest_ip_address.s_addr = ip_header->daddr;
     source_ip_address.s_addr = ip_header->saddr;
 
     strcpy(current_flow.source_ip_address, inet_ntoa(source_ip_address));
     strcpy(current_flow.dest_ip_address, inet_ntoa(dest_ip_address));
-
     current_flow.ip_protocol = ip_header->protocol;
 
     if (current_flow.ip_protocol == IPPROTO_TCP)
     {
-        tcp_header = (struct tcphdr *)(packet + sizeof(struct ethhdr) + ip_header->ihl * 4);
+        tcp_header = (struct tcphdr *)(packet + sizeof(struct ethhdr) + ip_header_length_in_bytes);
 
         current_flow.source_port = ntohs(tcp_header->source);
         current_flow.dest_port = ntohs(tcp_header->dest);
     }
     else if (current_flow.ip_protocol == IPPROTO_UDP)
     {
-        udp_header = (struct udphdr *)(packet + sizeof(struct ethhdr) + ip_header->ihl * 4);
+        udp_header = (struct udphdr *)(packet + sizeof(struct ethhdr) + ip_header_length_in_bytes);
 
         current_flow.source_port = ntohs(udp_header->source);
         current_flow.dest_port = ntohs(udp_header->dest);
