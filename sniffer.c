@@ -73,44 +73,46 @@ void SignalHandler(int signo)
 
 int CreateRawSocket()
 {
-    int rawsock;
+    int raw_socket;
 
     /* PF_Packet to access OSI Layer 2*/
     /* ETH_P_IP to allow only IPv4 packets*/
-    if ((rawsock = socket(PF_PACKET, SOCK_RAW, htons(ETH_P_IP))) == -1)
+    if ((raw_socket = socket(PF_PACKET, SOCK_RAW, htons(ETH_P_IP))) == -1)
     {
-        perror("Error creating raw socket: ");
-        close(rawsock);
+        perror("Error creating raw socket");
+        close(raw_socket);
         exit(-1);
     }
-    return rawsock;
+    return raw_socket;
 }
 
-int BindRawSocketToInterface(char *interface, int rawsock, int protocol)
+int BindRawSocketToInterface(char *interface, int raw_socket, int protocol)
 {
-    struct sockaddr_ll sll;
-    struct ifreq ifr;
+    struct sockaddr_ll socket_address;
+    struct ifreq interface_request;
 
     /* Ensures that the structures are initially empty before populating*/
-    bzero(&sll, sizeof(sll));
-    bzero(&ifr, sizeof(ifr));
+    bzero(&socket_address, sizeof(socket_address));
+    bzero(&interface_request, sizeof(interface_request));
 
-    strncpy((char *)ifr.ifr_name, interface, IFNAMSIZ);
-    if ((ioctl(rawsock, SIOCGIFINDEX, &ifr)) == -1)
+    /* Validate interface*/
+    strncpy((char *)interface_request.ifr_name, interface, IFNAMSIZ);
+    if ((ioctl(raw_socket, SIOCGIFINDEX, &interface_request)) == -1)
     {
         perror("Error getting interface index");
-        close(rawsock);
+        close(raw_socket);
         return -1;
     }
-    /* Bind our raw socket to this interface */
 
-    sll.sll_family = AF_PACKET;
-    sll.sll_ifindex = ifr.ifr_ifindex;
-    sll.sll_protocol = htons(protocol);
-    if ((bind(rawsock, (struct sockaddr *)&sll, sizeof(sll))) == -1)
+    socket_address.sll_family = AF_PACKET;
+    socket_address.sll_ifindex = interface_request.ifr_ifindex;
+    socket_address.sll_protocol = htons(protocol);
+
+    /* Bind raw socket to interface*/
+    if ((bind(raw_socket, (struct sockaddr *)&socket_address, sizeof(socket_address))) == -1)
     {
         perror("Error binding raw socket to interface");
-        close(rawsock);
+        close(raw_socket);
         return -1;
     }
     return 1;
@@ -118,7 +120,9 @@ int BindRawSocketToInterface(char *interface, int rawsock, int protocol)
 
 void UpdateFlowList(struct Flow current_flow)
 {
+    /* Increments count on matching flows*/
     int matching_flow_found = 0;
+
     for (int i = 0; i < number_of_unique_flows; i++)
     {
         if (strcmp(flows[i].source_ip_address, current_flow.source_ip_address) == 0 &&
@@ -133,6 +137,7 @@ void UpdateFlowList(struct Flow current_flow)
         }
     }
 
+    /* Adds new flow if no matching flow is found*/
     if (!matching_flow_found)
     {
         if (number_of_unique_flows < MAX_FLOWS)
@@ -147,7 +152,8 @@ void UpdateFlowList(struct Flow current_flow)
         }
         else
         {
-            fprintf(stderr, "Max flow limit reached. Ignoring new flows.\n");
+            fprintf(stderr, "Max flow limit reached.\n");
+            terminate_program = 1;
         }
     }
 }
@@ -159,9 +165,6 @@ void ParsePacketHeader(unsigned char *packet, int packet_length)
     struct tcphdr *tcp_header;
     struct udphdr *udp_header;
 
-    struct in_addr dest_ip_address;
-    struct in_addr source_ip_address;
-
     if (packet_length < (sizeof(struct ethhdr) + sizeof(struct iphdr) + sizeof(struct tcphdr)))
     {
         fprintf(stderr, "IP protocol header not present\n");
@@ -172,16 +175,18 @@ void ParsePacketHeader(unsigned char *packet, int packet_length)
 
     if (ntohs(ethernet_header->h_proto) != ETH_P_IP)
     {
-        fprintf(stderr, "Not an IP packet\n");
+        fprintf(stderr, "Not an IPv4 packet\n");
         return;
     }
+
+    struct Flow current_flow;
+    struct in_addr dest_ip_address;
+    struct in_addr source_ip_address;
 
     ip_header = (struct iphdr *)(packet + sizeof(struct ethhdr));
 
     dest_ip_address.s_addr = ip_header->daddr;
     source_ip_address.s_addr = ip_header->saddr;
-
-    struct Flow current_flow;
 
     strcpy(current_flow.source_ip_address, inet_ntoa(source_ip_address));
     strcpy(current_flow.dest_ip_address, inet_ntoa(dest_ip_address));
@@ -190,7 +195,7 @@ void ParsePacketHeader(unsigned char *packet, int packet_length)
 
     if (current_flow.ip_protocol == IPPROTO_TCP)
     {
-        tcp_header = (struct tcphdr *)(packet + sizeof(struct ethhdr) + ip_header->ihl + 4);
+        tcp_header = (struct tcphdr *)(packet + sizeof(struct ethhdr) + ip_header->ihl * 4);
 
         current_flow.source_port = ntohs(tcp_header->source);
         current_flow.dest_port = ntohs(tcp_header->dest);
